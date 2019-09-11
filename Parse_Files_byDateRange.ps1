@@ -1,0 +1,1 @@
+﻿Get-ChildItem "\\Usvapdna-a005a\rritinfo$\Measurement\Mitutoyo\Data\Diesink" -recurse | Where-Object {$_.CreationTime -gt "12/03/2018" -and $_.CreationTime -lt "12/05/2018"} | Select-String -Pattern '^%' | Select -ExpandProperty line | Set-Content "C:\ATS\Output.txt"

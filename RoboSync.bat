@@ -1,0 +1,1 @@
+ROBOCOPY "folder1" "folder2" /MON:1 /E /MT:8
