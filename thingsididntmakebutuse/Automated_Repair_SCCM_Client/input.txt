@@ -1,0 +1,2 @@
+HIC-SCCM-001.virtual.local
+*HIC-ADDC-001.virtual.local
