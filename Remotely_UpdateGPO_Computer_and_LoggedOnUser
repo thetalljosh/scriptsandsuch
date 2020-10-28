@@ -1,0 +1,41 @@
+#Run this from configuration manager scripts or with invoke-command -filepath
+#Run Computer GPUpdate 
+cmd "/c echo n | gpupdate /target:computer /force /wait:0" | Out-Null
+#Now comes the hard part - to run the gpupdate for the logged-on user session
+$ExplorerProcess = Get-WmiObject win32_process | Where-Object { $_.name -Match 'explorer'}
+
+$LoggedOnUser = if($ExplorerProcess.getowner().user.count -gt 1){
+    $ExplorerProcess.getowner().user[0]
+}else{$ExplorerProcess.getowner().user}
+
+If($LoggedOnUser.trim() -eq "") {    "Computer GPUpdate Successful. No active user session";  Return}
+
+#To run the logged-on user session GPUpdate, create a temp, one-off, self-deleting scheduled task to run gpupdate
+$TaskName = "Run User GPUpdate - $((Get-Date).ToString('dd-MM-yyyy-HH-mm-ss'))"
+$ShedService = New-Object -comobject 'Schedule.Service'
+$ShedService.Connect()
+
+$Task = $ShedService.NewTask(0)
+$Task.RegistrationInfo.Description = 'User GPUpdate'
+$Task.Settings.Enabled = $true
+$Task.Settings.AllowDemandStart = $true
+$Task.Settings.DeleteExpiredTaskAfter = 'PT0S'
+$Task.Settings.StartWhenAvailable = $True
+
+$trigger = $task.triggers.Create(1)
+$trigger.StartBoundary = [DateTime]::Now.AddSeconds(5).ToString("yyyy-MM-dd'T'HH:mm:ss")
+$trigger.EndBoundary = [DateTime]::Now.AddSeconds(30).ToString("yyyy-MM-dd'T'HH:mm:ss")
+$trigger.Enabled = $true
+
+$ScriptCode = """ cmd /c echo n | gpupdate.exe /target:user /force /wait:0 """
+$PwshArgument = "-ExecutionPolicy ByPass -NoProfile -WindowStyle Hidden -command $ScriptCode"
+
+$action = $Task.Actions.Create(0)
+$action.Path = 'Powershell.exe'
+$action.Arguments = $PwshArgument 
+$taskFolder = $ShedService.GetFolder("\")
+
+try{
+    $taskFolder.RegisterTaskDefinition($TaskName, $Task , 6, 'Users' , $null, 4) | Out-Null
+    "Computer GPO and User $LoggedOnUser GPO update Successful"
+} Catch { "GPUpdate Failed - $($_.Exception.Message)" }
